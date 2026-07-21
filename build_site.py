@@ -18,6 +18,7 @@ import urllib.request
 
 BASE = "https://cardealers.gtacfinance.com/"
 HOST = "cardealers.gtacfinance.com"
+DASHBOARD_URL = "https://app.greenlightrecover.com/login"  # MY ACCOUNT / Dealer Login target
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
@@ -270,6 +271,11 @@ def build():
         for a in soup.find_all("a", href=True):
             h = a["href"].strip()
             if h.startswith(("#", "mailto:", "tel:", "javascript:", "data:")): continue
+            # Account/login entry points (MY ACCOUNT button, Dealer Login) -> live dashboard.
+            # The static dealer-login/reset pages have no backend to authenticate against.
+            if page_slug_for(h) in ("dealer-login", "dealer-password-reset"):
+                a["href"] = DASHBOARD_URL
+                continue
             pl = page_link(h, slug)
             if pl is not None:
                 a["href"] = pl
