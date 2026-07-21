@@ -23,7 +23,7 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 RAW  = os.path.join(ROOT, "raw")      # raw downloaded HTML per page
-SITE = os.path.join(ROOT, "site")     # final static output
+SITE = os.path.join(ROOT, "docs")     # final static output (GitHub Pages serves /docs)
 ASSETS_SUB = "assets"                 # asset dir inside site/
 for d in (RAW, SITE): os.makedirs(d, exist_ok=True)
 
@@ -44,11 +44,17 @@ def fetch(url, binary=False, tries=3):
     print(f"   !! FAILED {url}: {last}")
     return (None, None, url)
 
+def canon(slug):
+    """Canonicalize case-variant slugs (WP slugs are case-insensitive).
+    /BOOK-A-CALL/ and /book-a-call/ are the same post (canonical = lowercase);
+    a case-insensitive local FS can't hold both folders anyway."""
+    return slug.lower() if slug.lower() == "book-a-call" else slug
+
 def slug_for(url):
     """Map a page URL to an output dir (pretty URLs)."""
     p = urlparse(url).path
     if p in ("", "/"): return ""       # homepage -> site/index.html
-    return p.strip("/")                 # e.g. faq -> site/faq/index.html
+    return canon(p.strip("/"))          # e.g. faq -> site/faq/index.html
 
 def raw_path(url):
     s = slug_for(url)
