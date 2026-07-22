@@ -19,6 +19,8 @@ import urllib.request
 BASE = "https://cardealers.gtacfinance.com/"
 HOST = "cardealers.gtacfinance.com"
 DASHBOARD_URL = "https://app.greenlightrecover.com/login"  # MY ACCOUNT / Dealer Login target
+# dark gradient baked over background images so overlaid text stays readable
+SCRIM_GRAD = "linear-gradient(rgba(7,21,23,.42),rgba(7,21,23,.56))"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
@@ -201,9 +203,77 @@ def rewrite_srcset(val, base_url, slug):
         out.append(" ".join([link] + bits[1:]))
     return ", ".join(out)
 
+# Menu links to remove from the whole site (header + footer), per request.
+REMOVE_LINK_HOSTS = ("gtacfinance.com", "gtacfoundation.org")
+
+def strip_removed_menu_links(soup):
+    """Remove GTAC FINANCE / GTAC FOUNDATION menu items site-wide. In the header the
+    'GTAC' dropdown then holds only 'Contact Us' -> collapse it into a direct
+    top-level 'Contact Us' link. In the footer their column is left empty -> remove
+    the empty nav widget and its orphaned 'GTAC' heading."""
+    # 1) remove the two external org links (their <li> menu items)
+    for a in list(soup.find_all("a", href=True)):
+        host = urlparse(a["href"]).netloc.lower()
+        if host.startswith("www."): host = host[4:]
+        if host in REMOVE_LINK_HOSTS:
+            (a.find_parent("li") or a).decompose()
+    # 2) header: collapse the single-item 'GTAC' dropdown into a plain 'Contact Us' link
+    for pa in list(soup.find_all("a", href="#")):
+        if pa.get_text(" ", strip=True) != "GTAC":
+            continue
+        li = pa.find_parent("li")
+        sub = li.find("ul") if li else None
+        child = sub.find("a", href=True) if sub else None
+        if not child:
+            continue
+        new_href, new_txt = child["href"], child.get_text(" ", strip=True)
+        for sp in pa.find_all("span"):     # drop the dropdown toggle/arrow
+            sp.decompose()
+        pa.clear(); pa.append(new_txt)
+        pa["href"] = new_href
+        pa["aria-expanded"] = "false"
+        for attr in ("aria-haspopup",):
+            if pa.has_attr(attr): del pa[attr]
+        sub.decompose()
+        if li and li.get("class"):
+            li["class"] = [c for c in li["class"] if c != "menu-item-has-children"]
+    # 3) footer: drop nav-menu widgets left empty + the orphaned 'GTAC' heading
+    for ul in list(soup.select("ul.elementor-nav-menu")):
+        if not ul.find("li"):
+            (ul.find_parent(class_="elementor-widget-nav-menu") or ul).decompose()
+    for h in list(soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"])):
+        if h.get_text(" ", strip=True) == "GTAC":
+            (h.find_parent(class_="elementor-widget-heading") or h).decompose()
+
+# White text on the brand teal (#03b0a6) is only ~2.6:1 contrast. Deepen the teal
+# ONLY where it is a *background* so white text reads clearly; teal text/accents stay.
+TEAL_SRC = "#03b0a6"
+TEAL_BG_DEEP = "#017d73"
+def deepen_teal_backgrounds():
+    pat = re.compile(r"(background(?:-color)?\s*:\s*)#03b0a6", re.I)
+    for f in glob_css():
+        txt = open(f, encoding="utf-8", errors="ignore").read()
+        new = pat.sub(lambda m: m.group(1) + TEAL_BG_DEEP, txt)
+        if new != txt:
+            open(f, "w", encoding="utf-8").write(new)
+            print("deepened teal backgrounds in", os.path.basename(f))
+
+def glob_css():
+    import glob
+    return glob.glob(os.path.join(SITE, ASSETS_SUB, "wp-content", "cache",
+                                  "tw_optimize", "css", "*.css"))
+
 def build():
     from bs4 import BeautifulSoup
     pages = json.load(open(os.path.join(ROOT, "pages.json")))
+    # copy the polish layer into the output tree
+    src = os.path.join(ROOT, "assets-src", "redesign.css")
+    if os.path.exists(src):
+        dst = os.path.join(SITE, ASSETS_SUB, "redesign.css")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(src, encoding="utf-8") as a, open(dst, "w", encoding="utf-8") as b:
+            b.write(a.read())
+        print("copied redesign.css")
     # build slug lookup
     for url in pages:
         s = slug_for(url)
@@ -213,6 +283,7 @@ def build():
         slug = slug_for(url)
         html = open(os.path.join(RAW, pages[url]), encoding="utf-8").read()
         soup = BeautifulSoup(html, "html.parser")
+        strip_removed_menu_links(soup)
 
         # de-lazy images -> promote real url into src/srcset, switch to native lazy-loading
         for img in soup.find_all("img"):
@@ -226,6 +297,14 @@ def build():
                 img["class"] = [c for c in cls if c != "lazy"]
             if was_lazy and not img.get("loading"):
                 img["loading"] = "lazy"
+
+        # Elementor lazy-loads container background images (background-image:none
+        # !important until its JS adds .e-lazyloaded). That JS is deferred, so mark
+        # every container e-no-lazyload -> backgrounds render immediately, no JS needed.
+        for con in soup.select(".e-con"):
+            cls = con.get("class", [])
+            if "e-no-lazyload" not in cls:
+                con["class"] = cls + ["e-no-lazyload"]
 
         # de-lazy iframes (JotForm / Replit calculators / Google Maps embeds) so the
         # real external src loads without depending on the deferred lazyload JS
@@ -291,7 +370,12 @@ def build():
                 u = urljoin(base, raw)
                 if not local_for(u): return m.group(0)
                 return f'url("{asset_link(u, sl)}")'
-            tag["style"] = CSS_URL.sub(repl, st)
+            st = CSS_URL.sub(repl, st)
+            # bake a readability scrim INTO real background images (guarantees text
+            # contrast regardless of DOM nesting — more robust than a ::before overlay)
+            st = re.sub(r"(background\s*:\s*)(url\((?![\"']?data:))",
+                        r"\1" + SCRIM_GRAD + r", \2", st, flags=re.I)
+            tag["style"] = st
 
         # <style> blocks : same de-lazy + localize
         for st in soup.find_all("style"):
@@ -306,18 +390,25 @@ def build():
                 st.string.replace_with(CSS_URL.sub(repl2, txt))
 
         # Ensure Elementor entrance-animation content is visible without relying on
-        # deferred JS (tw_optimize delays the animation JS until user interaction).
+        # deferred JS (tw_optimize delays the animation JS until user interaction),
+        # then load the professional polish layer LAST so it wins the cascade.
         if soup.head:
             fix = soup.new_tag("style")
             fix.string = (".elementor-invisible{opacity:1 !important;visibility:visible !important;}"
                           ".elementor-widget.elementor-invisible{opacity:1 !important;}")
             soup.head.append(fix)
+            link = soup.new_tag("link", rel="stylesheet")
+            link["href"] = rel(ASSETS_SUB + "/redesign.css", slug)
+            soup.head.append(link)
 
         out_dir = os.path.join(SITE, slug)
         os.makedirs(out_dir, exist_ok=True)
         with open(os.path.join(out_dir, "index.html"), "w", encoding="utf-8") as f:
             f.write(str(soup))
         print(f"   [{slug or '/'}] ok")
+
+    # accessibility: deepen teal backgrounds for readable white text
+    deepen_teal_backgrounds()
 
     # report
     dups = {m: v for m, v in MD5.items() if len(set(v)) > 1}

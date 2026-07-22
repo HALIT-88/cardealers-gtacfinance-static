@@ -1,0 +1,143 @@
+/* ============================================================
+   GTAC Car Dealers — professional polish layer (redesign.css)
+   Presentation only. No content/text/image/markup is changed.
+   Loaded LAST so it refines the original Elementor styling.
+   ============================================================ */
+
+:root{
+  --gtac-teal:#03b0a6;
+  --gtac-teal-600:#02968d;
+  --gtac-teal-700:#027d76;
+  --gtac-ink:#17242a;        /* strong readable body text */
+  --gtac-ink-soft:#43535b;   /* secondary text */
+  --gtac-line:rgba(3,176,166,.16);
+  --gtac-radius:16px;
+  --gtac-radius-sm:12px;
+  --gtac-shadow-sm:0 4px 14px -6px rgba(16,36,42,.20);
+  --gtac-shadow:0 18px 44px -20px rgba(16,36,42,.30);
+  --gtac-ease:cubic-bezier(.22,.61,.36,1);
+  --gtac-scrim:linear-gradient(180deg,rgba(7,21,23,.70) 0%,rgba(7,21,23,.60) 50%,rgba(7,21,23,.74) 100%);
+}
+
+/* ---------- 0. Global hygiene ---------- */
+html{ scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+body{ -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility; }
+html,body{ overflow-x:hidden; max-width:100%; }
+img,svg,video,iframe{ max-width:100%; }
+*{ -webkit-tap-highlight-color:transparent; }
+
+/* ---------- 1. MOTION — calm, comfortable, modern ----------
+   The original fires fast Elementor "zoomIn" entrance animations on
+   every block. Replace that busyness with a single, slow, gentle
+   fade so content settles instead of popping. Fail-safe: content is
+   always visible even if the (deferred) animation JS never runs.     */
+.elementor-invisible{ opacity:1 !important; }
+
+@keyframes gtacRise{ from{opacity:0; transform:translateY(18px);} to{opacity:1; transform:none;} }
+
+.elementor-widget.animated,
+.elementor-element.animated,
+.animated{
+  animation-duration:1.05s !important;
+  animation-delay:0s !important;
+  animation-timing-function:var(--gtac-ease) !important;
+  animation-name:gtacRise !important;   /* remap zoomIn/bounce/etc -> gentle rise */
+}
+
+/* Comfortable micro-interactions instead of loud motion */
+a, .elementor-button, button{ transition:transform .28s var(--gtac-ease), box-shadow .28s var(--gtac-ease), background-color .28s var(--gtac-ease), color .28s var(--gtac-ease), opacity .28s var(--gtac-ease); }
+
+@media (prefers-reduced-motion: reduce){
+  html{ scroll-behavior:auto; }
+  *,*::before,*::after{ animation:none !important; transition:none !important; }
+  .elementor-invisible,.animated{ opacity:1 !important; transform:none !important; }
+}
+
+/* ---------- 2. TEXT CONTRAST OVER IMAGES ----------
+   A dark scrim is baked directly into each background image at build time
+   (see build_site.py), so text stays readable regardless of DOM nesting.
+   Here we just add a soft shadow to text that sits over imagery.         */
+/* white/light text sitting over imagery stays crisp */
+.elementor-element[style*="url("] h1,
+.elementor-element[style*="url("] h2,
+.elementor-element[style*="url("] h3,
+.elementor-element[style*="url("] h4,
+.elementor-element[style*="url("] p,
+.elementor-element[style*="url("] li,
+.elementor-element[style*="url("] span{
+  text-shadow:0 1px 10px rgba(0,0,0,.45);
+}
+
+/* ---------- 3. COLOUR / READABILITY ----------
+   Body copy was a pale grey (#7A7A7A) on white — too weak. Deepen it
+   on light surfaces only; text placed on dark/brand areas keeps its
+   explicit colour and is untouched.                                   */
+:root{ --e-global-color-text:#43535b; }
+body{ color:var(--gtac-ink); }
+p, li{ color:var(--gtac-ink-soft); line-height:1.72; }
+h1,h2,h3,h4,h5,h6{ letter-spacing:-.01em; line-height:1.18; }
+
+/* keep brand teal consistent & vivid */
+.elementor-heading-title[style*="color: var(--e-global-color-astglobalcolor0)"],
+:root{ --e-global-color-astglobalcolor0:#03b0a6; }
+
+/* ---------- 4. HERO — balanced height & legible on every screen ---------- */
+@media (max-width:1024px){
+  section.elementor-section[style*="min-height"],
+  .elementor-element[style*="min-height:100vh"]{ min-height:auto !important; }
+}
+
+/* ---------- 5. BUTTONS — refined, tactile, accessible ---------- */
+.elementor-button, a.elementor-button, .elementor-button-link{
+  border-radius:999px !important;
+  font-weight:600 !important;
+  letter-spacing:.2px;
+  box-shadow:var(--gtac-shadow-sm);
+  will-change:transform;
+}
+.elementor-button:hover, a.elementor-button:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--gtac-shadow);
+}
+.elementor-button:active{ transform:translateY(0); }
+/* visible keyboard focus for accessibility */
+a:focus-visible, .elementor-button:focus-visible, button:focus-visible{
+  outline:3px solid var(--gtac-teal); outline-offset:3px; border-radius:8px;
+}
+
+/* ---------- 6. CARDS / CONTENT BLOCKS — soft, modern depth ---------- */
+.elementor-widget-wrap.e-con-inner > .elementor-element,
+.elementor-element .elementor-widget-container:has(> .elementor-icon-box-wrapper){ }
+.elementor-section .elementor-column .elementor-widget-wrap,
+.e-con-boxed{ }
+
+/* generic “card” lift for boxed inner containers that use a light bg */
+.e-con-inner[style*="background-color"],
+.elementor-element[style*="background-color:#fff"],
+.elementor-element[style*="background-color: #ffffff"]{
+  border-radius:var(--gtac-radius) !important;
+  box-shadow:var(--gtac-shadow-sm);
+}
+
+/* ---------- 7. LAYOUT RHYTHM & RESPONSIVE ---------- */
+@media (max-width:767px){
+  /* tame oversized section padding on phones */
+  .elementor-section.elementor-section-boxed > .elementor-container,
+  .e-con{ padding-left:18px !important; padding-right:18px !important; }
+  section[style*="padding"]{ }
+  /* fluid headings so nothing overflows on small screens */
+  h1, .elementor-heading-title{ font-size:clamp(1.9rem, 8vw, 2.6rem) !important; line-height:1.2 !important; word-break:normal; overflow-wrap:anywhere; }
+  h2{ font-size:clamp(1.5rem, 6.4vw, 2.1rem) !important; }
+  /* embedded forms / calculators / maps fill the width cleanly */
+  iframe{ width:100% !important; }
+}
+
+/* prevent any child from forcing horizontal scroll */
+.elementor, .elementor-section, .e-con{ max-width:100%; }
+
+/* ---------- 8. FOOTER — tidy spacing & consistent brand ---------- */
+footer a, .elementor-location-footer a{ transition:color .2s var(--gtac-ease), opacity .2s var(--gtac-ease); }
+footer a:hover, .elementor-location-footer a:hover{ opacity:.82; }
+
+/* ---------- 9. SELECTION & scrollbar niceties ---------- */
+::selection{ background:rgba(3,176,166,.28); }
