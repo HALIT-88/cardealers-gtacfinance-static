@@ -20,7 +20,7 @@ BASE = "https://cardealers.gtacfinance.com/"
 HOST = "cardealers.gtacfinance.com"
 DASHBOARD_URL = "https://app.greenlightrecover.com/login"  # MY ACCOUNT / Dealer Login target
 # dark gradient baked over background images so overlaid text stays readable
-SCRIM_GRAD = "linear-gradient(rgba(7,21,23,.42),rgba(7,21,23,.56))"
+SCRIM_GRAD = "linear-gradient(rgba(7,21,23,.55),rgba(7,21,23,.66))"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 

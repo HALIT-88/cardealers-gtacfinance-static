@@ -65,7 +65,16 @@ a, .elementor-button, button{ transition:transform .28s var(--gtac-ease), box-sh
 .elementor-element[style*="url("] p,
 .elementor-element[style*="url("] li,
 .elementor-element[style*="url("] span{
-  text-shadow:0 1px 10px rgba(0,0,0,.45);
+  text-shadow:0 2px 14px rgba(0,0,0,.70), 0 1px 3px rgba(0,0,0,.55);
+}
+/* Body copy (paragraphs & list items) over a background image must be LIGHT —
+   the dark ink used for white sections is invisible on a scrimmed photo.
+   Headings keep their teal/white colour; buttons are untouched (not p/li).   */
+.elementor-element[style*="url("] p,
+.elementor-element[style*="url("] li,
+.elementor-element[style*="url("] .elementor-icon-list-text,
+.elementor-element[style*="url("] .elementor-widget-text-editor{
+  color:#ffffff !important;
 }
 
 /* ---------- 3. COLOUR / READABILITY ----------
