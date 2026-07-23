@@ -54,36 +54,34 @@ a, .elementor-button, button{ transition:transform .28s var(--gtac-ease), box-sh
 }
 
 /* ---------- 2. TEXT CONTRAST OVER IMAGES ----------
-   A dark scrim is baked directly into each background image at build time
-   (see build_site.py), so text stays readable regardless of DOM nesting.
-   Here we just add a soft shadow to text that sits over imagery.         */
-/* white/light text sitting over imagery stays crisp */
-.elementor-element[style*="url("] h1,
-.elementor-element[style*="url("] h2,
-.elementor-element[style*="url("] h3,
-.elementor-element[style*="url("] h4,
-.elementor-element[style*="url("] p,
-.elementor-element[style*="url("] li,
-.elementor-element[style*="url("] span{
-  text-shadow:0 2px 14px rgba(0,0,0,.70), 0 1px 3px rgba(0,0,0,.55);
-}
-/* Body copy (paragraphs & list items) over a background image must be LIGHT —
-   the dark ink used for white sections is invisible on a scrimmed photo.
-   Headings keep their teal/white colour; buttons are untouched (not p/li).   */
-.elementor-element[style*="url("] p,
-.elementor-element[style*="url("] li,
-.elementor-element[style*="url("] .elementor-icon-list-text,
-.elementor-element[style*="url("] .elementor-widget-text-editor{
-  color:#ffffff !important;
+   The original Elementor design already uses WHITE text on its dark / image
+   sections and dark text on white sections — that is correct, so we DO NOT
+   recolour text. We only (a) darken image backgrounds a touch so the white
+   text is comfortable on busy photos, and (b) add a soft text-shadow.
+   Inline-background images get their scrim baked in at build time; sections
+   whose background image is applied via Elementor CSS are marked .gtac-scrim. */
+.elementor-element[style*="url("] h1, .elementor-element[style*="url("] h2,
+.elementor-element[style*="url("] h3, .elementor-element[style*="url("] h4,
+.elementor-element[style*="url("] p,  .elementor-element[style*="url("] li,
+.gtac-scrim h1, .gtac-scrim h2, .gtac-scrim h3, .gtac-scrim h4,
+.gtac-scrim p, .gtac-scrim li, .gtac-scrim .elementor-heading-title{
+  text-shadow:0 1px 8px rgba(0,0,0,.45);
 }
 
-/* ---------- 3. COLOUR / READABILITY ----------
-   Body copy was a pale grey (#7A7A7A) on white — too weak. Deepen it
-   on light surfaces only; text placed on dark/brand areas keeps its
-   explicit colour and is untouched.                                   */
-:root{ --e-global-color-text:#43535b; }
-body{ color:var(--gtac-ink); }
-p, li{ color:var(--gtac-ink-soft); line-height:1.72; }
+/* CSS-applied background-image sections: overlay a readability scrim so the
+   existing white text is comfortable (inline images are scrimmed at build). */
+.gtac-scrim{ position:relative; isolation:isolate; }
+.gtac-scrim::before{
+  content:""; position:absolute; inset:0; z-index:0;
+  background:linear-gradient(rgba(7,21,23,.42),rgba(7,21,23,.55));
+  pointer-events:none;
+}
+.gtac-scrim > *{ position:relative; z-index:1; }
+
+/* ---------- 3. READABILITY ----------
+   Do NOT recolour body text globally — the original per-section colours are
+   correct (dark on white, white on dark). We only refine rhythm/spacing.     */
+p, li{ line-height:1.72; }
 h1,h2,h3,h4,h5,h6{ letter-spacing:-.01em; line-height:1.18; }
 
 /* keep brand teal consistent & vivid */

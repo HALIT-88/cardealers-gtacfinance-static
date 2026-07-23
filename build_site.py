@@ -20,7 +20,35 @@ BASE = "https://cardealers.gtacfinance.com/"
 HOST = "cardealers.gtacfinance.com"
 DASHBOARD_URL = "https://app.greenlightrecover.com/login"  # MY ACCOUNT / Dealer Login target
 # dark gradient baked over background images so overlaid text stays readable
-SCRIM_GRAD = "linear-gradient(rgba(7,21,23,.55),rgba(7,21,23,.66))"
+SCRIM_GRAD = "linear-gradient(rgba(7,21,23,.38),rgba(7,21,23,.50))"
+
+# Runtime text-contrast guard (injected at end of <body> on every page). Forces
+# white text on any element whose effective (rendered) background is dark — the
+# accurate, all-cases fix for dark-text-on-dark-background across the whole site.
+CONTRAST_GUARD_JS = r"""(function(){
+  function bgLum(el){
+    var n=el;
+    while(n && n.nodeType===1){
+      var s=getComputedStyle(n);
+      if(s.backgroundImage && s.backgroundImage!=='none' && /url\(|gradient/i.test(s.backgroundImage)) return 0.12;
+      var m=(s.backgroundColor||'').match(/[\d.]+/g);
+      if(m && m.length>=3 && !(m.length>=4 && parseFloat(m[3])===0))
+        return (0.2126*+m[0]+0.7152*+m[1]+0.0722*+m[2])/255;
+      n=n.parentElement;
+    }
+    return 1;
+  }
+  function run(){
+    var els=document.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,.elementor-heading-title,.elementor-icon-list-text,.elementor-widget-text-editor,.elementor-widget-text-editor *,blockquote');
+    for(var i=0;i<els.length;i++){
+      var el=els[i];
+      if(el.closest && el.closest('.elementor-button,.elementor-tab-title,form,button')) continue;
+      if(bgLum(el)<0.5){ el.style.setProperty('color','#fff','important'); if(!el.style.textShadow) el.style.textShadow='0 1px 6px rgba(0,0,0,.45)'; }
+    }
+  }
+  if(document.readyState!=='loading') run(); else document.addEventListener('DOMContentLoaded',run);
+  window.addEventListener('load',run);
+})();"""
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
@@ -263,6 +291,51 @@ def glob_css():
     return glob.glob(os.path.join(SITE, ASSETS_SUB, "wp-content", "cache",
                                   "tw_optimize", "css", "*.css"))
 
+def _luminance(color):
+    c = color.strip().lower()
+    if c.startswith("#"):
+        h = c[1:]
+        if len(h) == 3: h = "".join(x * 2 for x in h)
+        if len(h) < 6: return None
+        try: r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        except ValueError: return None
+    elif c.startswith("rgb"):
+        n = re.findall(r"[\d.]+", c)
+        if len(n) < 3: return None
+        r, g, b = float(n[0]), float(n[1]), float(n[2])
+    else:
+        return None
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+
+# Some section backgrounds are applied via Elementor's per-element CSS (not inline).
+# Element ids are alphanumeric (e.g. "ga07ao2"), NOT just hex, and the rules are
+# comma-separated groups. We match only the *element's own* background signature
+# (token followed by :not( / >.elementor / >.e-con) so decorative child-widget
+# backgrounds (e.g. small icons) never mark a whole section.
+def scan_css_bg_tokens():
+    block = re.compile(r"([^{}]+)\{([^{}]*)\}")
+    img_url = re.compile(r"background(?:-image)?\s*:\s*[^;]*url\(", re.I)
+    bg_col = re.compile(r"background(?:-color)?\s*:\s*(#[0-9a-f]{3,8}|rgba?\([^)]*\))", re.I)
+    own_bg = re.compile(r"((?:elementor-element-|e-con-)[0-9a-z]+)(?=:not\(|>\.elementor|>\.e-con|,|\{)", re.I)
+    imgs, darks = set(), set()
+    for f in glob_css():
+        css = open(f, encoding="utf-8", errors="ignore").read()
+        for m in block.finditer(css):
+            sel, body = m.group(1), m.group(2)
+            if "background" not in body:
+                continue
+            toks = own_bg.findall(sel)
+            if not toks:
+                continue
+            if img_url.search(body):
+                imgs.update(toks)
+            cm = bg_col.search(body)
+            if cm:
+                L = _luminance(cm.group(1))
+                if L is not None and L < 0.42:   # only clearly-dark section backgrounds
+                    darks.update(toks)
+    return imgs, darks
+
 def build():
     from bs4 import BeautifulSoup
     pages = json.load(open(os.path.join(ROOT, "pages.json")))
@@ -278,6 +351,10 @@ def build():
     for url in pages:
         s = slug_for(url)
         PAGE_SLUGS[urlparse(url).path.strip("/")] = s
+    # elements whose background (image or dark colour) is applied via CSS, so we
+    # can force light text over them (inline backgrounds are handled separately)
+    css_img_tokens, css_dark_tokens = scan_css_bg_tokens()
+    print(f"CSS bg tokens: {len(css_img_tokens)} image, {len(css_dark_tokens)} dark-colour")
     print(f"Building {len(pages)} pages ...")
     for url in pages:
         slug = slug_for(url)
@@ -388,6 +465,17 @@ def build():
                     if not local_for(u): return m.group(0)
                     return f'url("{asset_link(u, sl)}")'
                 st.string.replace_with(CSS_URL.sub(repl2, txt))
+
+        # Mark sections whose background (image / dark colour) is applied via CSS,
+        # so the polish layer can scrim them and force white text. Inline-background
+        # sections already carry their scrim + are handled by [style*="url("] rules.
+        for el in soup.find_all(class_=True):
+            if "url(" in (el.get("style") or ""):
+                continue  # inline background: handled by the baked scrim
+            cls = el.get("class", [])
+            if any(c in css_img_tokens for c in cls):
+                if "gtac-scrim" not in cls:
+                    el["class"] = cls + ["gtac-scrim"]
 
         # Ensure Elementor entrance-animation content is visible without relying on
         # deferred JS (tw_optimize delays the animation JS until user interaction),
